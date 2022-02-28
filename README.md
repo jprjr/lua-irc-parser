@@ -33,6 +33,24 @@ local parsed, pos = parser:parse(line)
 ]]
 ```
 
+## Installation
+
+### luarocks
+
+Available on [luarocks](https://luarocks.org/modules/jprjr/irc-parser):
+
+```bash
+luarocks install irc-parser
+```
+
+### OPM
+
+Available on [OPM](https://opm.openresty.org/package/jprjr/irc-parser/)
+
+```bash
+opm install jprjr/irc-parser
+```
+
 ## Usage
 
 By default, you can `require('irc-parser')`, and it will automatically
