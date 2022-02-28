@@ -38,17 +38,17 @@ release:
 github-release:
 	source $(HOME)/.github-token && github-release release \
 	  --user jprjr \
-	  --repo $(PACKAGE) \
+	  --repo lua-$(PACKAGE) \
 	  --tag v$(VERSION)
 	source $(HOME)/.github-token && github-release upload \
 	  --user jprjr \
-	  --repo $(PACKAGE) \
+	  --repo lua-$(PACKAGE) \
 	  --tag v$(VERSION) \
 	  --name $(PACKAGE)-$(VERSION).tar.gz \
 	  --file dist/$(PACKAGE)-$(VERSION).tar.gz
 	source $(HOME)/.github-token && github-release upload \
 	  --user jprjr \
-	  --repo $(PACKAGE) \
+	  --repo lua-$(PACKAGE) \
 	  --tag v$(VERSION) \
 	  --name $(PACKAGE)-$(VERSION).tar.xz \
 	  --file dist/$(PACKAGE)-$(VERSION).tar.xz
