@@ -168,16 +168,19 @@ local Loose = {
 local Strict__mt = {
   __index = Strict,
   __name  = 'irc-parser.strict',
+  __call  = Strict.parse,
 }
 
 local Twitch__mt = {
   __index = Twitch,
   __name  = 'irc-parser.twitch',
+  __call  = Twitch.parse,
 }
 
 local Loose__mt = {
   __index = Loose,
   __name  = 'irc-parser.loose',
+  __call  = Loose.parse,
 }
 
 local typ_map = {

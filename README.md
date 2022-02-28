@@ -9,7 +9,7 @@ An IRC parser in LPEG, with a pure-Lua fallback. Supports IRCv3 message tags.
 ```lua
 local parser = require('irc-parser').new()
 local line = '@message-id=12345;some-content=hello\\sthere;empty-str=;empty :nick!user@example.com PRIVMSG #a-room ::-) Hi there!'
-local parsed, pos = parser:parse(line)
+local parsed, pos = parser(line)
 
 --[[
   parsed is a table:
@@ -84,7 +84,8 @@ local mod = require('irc-parser')
 local strict_parser = mod.new(mod.STRICT)
 ```
 
-The parser exposes a single method, `:parse(str, [pos])`.
+The parser exposes a single method, `parser:parse(str, [pos])`. The parser itself
+can also be called as a function, `parser(str, [pos])`.
 
 It accepts a string argument, the string argument can be terminated with
 a newline character, or a carriage return and newline, or nothing. It also

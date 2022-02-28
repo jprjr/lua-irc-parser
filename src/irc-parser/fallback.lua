@@ -10,23 +10,8 @@ local TWITCH   = {}
 local LOOSE    = {}
 
 local Strict = {}
-local Strict__mt = {
-  __index = Strict,
-  __name  = 'irc-parser.strict',
-}
-
 local Twitch = {}
-local Twitch__mt = {
-  __index = Twitch,
-  __name  = 'irc-parser.twitch',
-}
-
 local Loose = {}
-local Loose__mt = {
-  __index = Loose,
-  __name  = 'irc-parser.loose',
-}
-
 
 Strict.escapes = {}
 for e=1,255 do
@@ -797,12 +782,28 @@ function Strict:parse(str,init)
   return self:parse_message(str,init,#str)
 end
 
-
 for k,v in pairs(Strict) do
   if not Twitch[k] then Twitch[k] = v end
   if not Loose[k] then Loose[k] = v end
 end
 
+local Strict__mt = {
+  __index = Strict,
+  __name  = 'irc-parser.strict',
+  __call = Strict.parse
+}
+
+local Twitch__mt = {
+  __index = Twitch,
+  __name  = 'irc-parser.twitch',
+  __call  = Twitch.parse,
+}
+
+local Loose__mt = {
+  __index = Loose,
+  __name  = 'irc-parser.loose',
+  __call  = Loose.parse
+}
 
 local typ_map = {
   [1] = Loose__mt,
