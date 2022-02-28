@@ -1,0 +1,50 @@
+name: produce coverage report
+
+on: [push]
+
+jobs:
+  coverage:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        luaVersion: [ "5.1", "5.2", "5.3", "5.4", "luajit" ]
+
+    steps:
+    - name: checkout
+      uses: actions/checkout@v2
+
+    - name: install gcovr
+      run: sudo pip3 install gcovr
+
+    - name: install lua (${{ matrix.luaversion }})
+      uses: leafo/gh-actions-lua@v8
+      with:
+        luaVersion: ${{ matrix.luaVersion }}
+
+    - name: Install LuaRocks
+      uses: leafo/gh-actions-luarocks@v4
+
+    - name: install busted
+      run: luarocks install busted
+
+    - name: install luacov
+      run: luarocks install luacov
+
+    - name: install luacov-reporter-gcovr
+      run: luarocks install luacov-reporter-gcovr
+
+    - name: generate coverage report
+      run: make coverage BUSTED_ARGS="-t fallback,version" LUA=$(command -v lua) COVERAGE=${{ matrix.luaVersion }}-fallback
+
+    - name: install lpeg
+      run: luarocks install lpeg
+
+    - name: generate coverage report
+      run: make coverage BUSTED_ARGS="-t lpeg,version" LUA=$(command -v lua) COVERAGE=${{ matrix.luaVersion }}-lpeg
+
+    - name: Codecov
+      uses: codecov/codecov-action@v2
+      with:
+        files: coverage/${{ matrix.luaVersion}}-fallback/index.xml,coverage/${{ matrix.luaVersion}}-lpeg/index.xml
+
