@@ -30,10 +30,11 @@ local CRLF   = P'\r\n'
 local LF     = P'\n'
 local HEXDIGIT = DIGIT + R('AF') + R('af')
 local SPECIAL = S'[]\\`_^{|}'
-local OCTET = P'1' * DIGIT * DIGIT
+local OCTET = DIGIT * DIGIT^-2
+local VALID_OCTET = P'1' * DIGIT * DIGIT
             + P'2' * (R'04'*DIGIT + P'5'*R'05')
             + DIGIT * DIGIT^-1
-local IP4 = OCTET * P'.' * OCTET * P'.' * OCTET * P'.' * OCTET
+local IP4 = VALID_OCTET * P'.' * VALID_OCTET * P'.' * VALID_OCTET * P'.' * VALID_OCTET
 local H16 = HEXDIGIT * HEXDIGIT^-3
 local HG  = H16 * P':'
 local LS32 = HG * H16 + IP4
@@ -70,13 +71,14 @@ local strict_grammar = {
 
   tags = Cf(Ct'' * (V'tag' * (P';' * V'tag')^0),rawset) * V'space',
 
-
   tag = Cg(C(V'tag_key') * ( (P'=' * V'tag_value') + Cc(false))),
-  tag_key = P'+'^-1 * ( V'vendor' * P'/' )^-1 * (LETTER + DIGIT + DASH)^1,
+  tag_key = P'+'^-1 * ( V'tag_vendor' * P'/' )^-1 * V'tag_name',
+  tag_vendor = V'host',
+  tag_name = (LETTER + DIGIT + DASH)^1,
   tag_value = Cmt(R('\001\009','\011\12','\014\031','\033\058','\060\255')^0 , unescape_tag_val),
 
   -- we create a distinct 'userhost' type,
-  -- so that we can override it in the twitch
+  -- so that we can override it
   -- grammar
   source = (Cg(V'host','host') * V'space') +
            (
@@ -93,12 +95,10 @@ local strict_grammar = {
   middle = V'nospcrlfcl' * (P':' + V'nospcrlfcl')^0,
   trailing = (P':' + P' ' + V'nospcrlfcl')^0,
 
-  vendor = V'host',
-  host = V'hostaddr' + V'hostname',
+  host = V'hostaddr' + (V'hostname' - (OCTET * '.' * OCTET * '.' * OCTET * '.' * OCTET)),
   hostname = V'label' * (P'.' * V'label')^0,
   hostaddr = V'ip4addr' + V'ip6addr',
   ip4addr = IP4,
-  -- we'll just take any combo of hex + colons
   ip6addr =        HG * HG * HG * HG * HG * HG * LS32
               + P'::' * HG * HG * HG * HG * HG * LS32
     + H16^-1  * P'::' * HG * HG * HG * HG * LS32
@@ -139,8 +139,14 @@ twitch_grammar.twitchusername = (LETTER + DIGIT) * (LETTER + DIGIT + P'_')^0
 -- so we override the userhost to just allow anything besides CR, LF, Space
 loose_grammar.userhost = V'nonwhite'^1
 
--- let the loose grammar accept invalid-ish IRC nicks
-loose_grammar.nick = (LETTER + DIGIT + SPECIAL + P'-')^1
+-- let the loose grammar accept anything for a nick, besides !@
+loose_grammar.nick =  R('\001\009','\011\012','\014\031','\034\063','\065\255')^1
+
+-- tag vendor, don't check for actual hostnames and ip addresses
+loose_grammar.tag_vendor = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1
+
+-- tag name, allow anything besides =;' '
+loose_grammar.tag_name = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1
 
 local strict_parser = Ct(P(strict_grammar)) * lpeg.Cp()
 --local strict_parser = Ct(P(require('pegdebug').trace(strict_grammar))) * lpeg.Cp()

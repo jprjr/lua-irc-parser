@@ -94,6 +94,7 @@ local function generate_backend_test(b)
       it('should only accept a #source with valid hostnames/ips', function()
         assert.is_nil(parser:parse(':nick!user@not_a_hostname PRIVMSG'))
         assert.is_nil(parser:parse(':nick!user@not/a/hostname PRIVMSG'))
+        assert.is_nil(parser:parse(':nick!user@256.0.0.1 PRIVMSG'))
         assert.is_same(parser:parse(':nick!user@127.0.0.1 PRIVMSG'), {
           command = 'PRIVMSG',
           source = {
@@ -142,6 +143,10 @@ local function generate_backend_test(b)
         -- can't be empty
         assert.is_nil(parser:parse(':@hostname PRIVMSG'))
       end)
+
+      it('should reject #tags with non-hostname vendors', function()
+        assert.is_nil(parser:parse('@not_a_domain/a=something PRIVMSG'))
+      end)
     end)
 
     describe('#loose parser', function()
@@ -161,11 +166,11 @@ local function generate_backend_test(b)
       end)
 
       it('should accept an invalid #nickame', function()
-        -- can't start with a digit or hyphen
-        assert.is_same(parser:parse(':0nick@hostname PRIVMSG'), {
+        -- allow any character
+        assert.is_same(parser:parse(':\001nick@hostname PRIVMSG'), {
           command = 'PRIVMSG',
           source = {
-            nick = '0nick',
+            nick = '\001nick',
             host = 'hostname',
           }
         })
@@ -179,6 +184,16 @@ local function generate_backend_test(b)
         -- can't be empty
         assert.is_nil(parser:parse(':@hostname PRIVMSG'))
       end)
+
+      it('should accept #tags with non-hostname vendors', function()
+        assert.is_same(parser:parse('@not_a_domain/a=something PRIVMSG'), {
+          tags = {
+            ['not_a_domain/a'] = 'something',
+          },
+          command = 'PRIVMSG',
+        })
+      end)
+
     end)
 
     describe('twitch parser', function()

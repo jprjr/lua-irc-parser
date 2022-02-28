@@ -58,6 +58,7 @@ function Strict.is_nonwhite(_,t)
     or (t >= 33 and t <= 255)
 end
 
+
 function Strict:is_letter(t)
   return self:is_upper(t) or self:is_lower(t)
 end
@@ -114,6 +115,42 @@ local function gen_isspecial(str)
 end
 
 Strict.is_special = gen_isspecial('[]\\`_^{|}')
+
+function Strict:looks_ip4(str,init,max)
+  local i = init
+  local t
+  local octets = 0
+  local octet = 0
+  local dflag = false
+  local valid = true -- unset if we get an octet outside of 0-255
+
+  while i<= max do
+    t = byte(str,i)
+    if t == 46 then
+      if i == init then return false, false end
+      if dflag then return false, false end
+      if octet > 255 then valid = false end
+      octet = 0
+      octets = octets + 1
+      dflag = true
+    elseif not self:is_digit(t) then
+      return false, false
+    else
+      octet = octet * 10
+      octet = octet + (t - 48)
+      dflag = false
+    end
+    i = i + 1
+  end
+
+  if dflag then return false, false end
+  octet = octet * 10
+  octet = octet + (t - 48)
+  if octet > 255 then valid = false end
+  octets = octets + 1
+
+  return octets == 4, valid
+end
 
 function Strict:parse_trailing(str,init,max)
   local i = init
@@ -258,6 +295,7 @@ end
 function Strict:parse_ip4addr(str,init,max)
   local i = init
   local t
+  local looks, valid
 
   while i <= max do
     t = byte(str,i)
@@ -265,9 +303,14 @@ function Strict:parse_ip4addr(str,init,max)
       i = i + 1
     else -- we may be seeing an ip4 address as part of a tag
       if i == init then return nil end
+      looks, valid = self:looks_ip4(str,init,i-1)
+      if not (looks and valid) then return nil end
       return init, i - 1
     end
   end
+
+  looks, valid = self:looks_ip4(str,init,max)
+  if not (looks and valid) then return nil end
 
   return init, max
 end
@@ -281,10 +324,13 @@ function Strict:parse_ip6addr(str,init,max)
     if self:is_hex(t) or t == 46 or t == 58 then
       i = i + 1
     else -- we may be seeing an ip6 address as part of a tag
+      if i == init then return nil end
+      if self:looks_ip4(str,init,i-1) then return nil end
       return init, i - 1
     end
   end
 
+  if self:looks_ip4(str,init,max) then return nil end
   return init, max
 end
 
@@ -336,11 +382,15 @@ function Strict:parse_hostname(str,init,max)
     end
     t = byte(str,i)
     if t ~= 46 then
+      if self:looks_ip4(str,init,i-1) then return nil end
       return init, i-1
     end
     m = i
     i = i + 1
   end
+
+  -- make sure this doesn't also match an IP4 address
+  if self:looks_ip4(str,init,m) then return nil end
 
   return init, m
 end
@@ -482,7 +532,7 @@ function Strict.parse_tag_value(_,str,init,max)
   return nil
 end
 
-function Strict:parse_tag_key_name(str,init,max)
+function Strict:parse_tag_name(str,init,max)
   local i, t
   i = init
   while i <= max do
@@ -497,6 +547,17 @@ function Strict:parse_tag_key_name(str,init,max)
     end
   end
   return nil
+end
+
+function Strict:parse_tag_vendor(str,init,max)
+  local _, e
+
+  _, e = self:parse_host(str,init,max)
+  if not e then return nil end
+  e = e + 1
+  if e > max then return nil end
+  if byte(str,e) ~= 47 then return nil end
+  return init, e
 end
 
 function Strict:parse_tag_key(str,init,max)
@@ -517,35 +578,12 @@ function Strict:parse_tag_key(str,init,max)
     return nil
   end
 
-  s,e = self:parse_host(str,i,max)
-  if s then -- a plain hostname can just be a key, ie, localhost
+  s, e = self:parse_tag_vendor(str,i,max)
+  if s then
     i = e + 1
-    if i > max then return nil end
-    t = byte(str,i)
-    if t == 47 then -- '/', we had a vendor tag
-      i = i + 1
-      if i > max then
-        return nil
-      end
-      s, e = self:parse_tag_key_name(str,i,max)
-      if not s then
-        return nil
-      end
-      return init,e
-    elseif not (t == 61 or t == 32 or t == 59) then -- equals, space, semicolon
-      -- we got a hostname (which is a superset of key, basically) and
-      -- aren't at the end of the key name
-      -- try again just in case
-      s, e = self:parse_tag_key_name(str,s,max)
-      if s then
-        return init, e
-      end
-      return nil
-    end
-    i = s -- reset i
   end
 
-  s, e = self:parse_tag_key_name(str,i,max)
+  s, e = self:parse_tag_name(str,i,max)
   if s then
     return init, e
   end
@@ -731,11 +769,48 @@ function Loose:parse_userhost(str,init,max)
   return init, max
 end
 
-function Loose:is_nickchar(t)
-  if self:is_letter(t) or self:is_special(t) or self:is_digit(t) or t == 45 then
-    return true
+function Loose.is_nickchar(_,t)
+  if
+       t == 0
+    or t == 10
+    or t == 13
+    or t == 32
+    or t == 33
+    or t == 64
+    then return false end
+  return true
+end
+
+-- just read until we see a slash and return true or space and return false
+function Loose.parse_tag_vendor(_,str,init,max)
+  local i, t
+  i = init
+  while i <= max do
+    t = byte(str,i)
+    if t == 32 or t == 59 or t == 61 then -- space, semicolon, equals
+      return nil
+    elseif t == 47 then
+      break
+    end
+    i = i + 1
   end
-  return false
+  if i == init or i > max then return nil end
+  return init, i
+end
+
+-- just read until we see a space or equals
+function Loose.parse_tag_name(_,str,init,max)
+  local i, t
+  i = init
+  while i <= max do
+    t = byte(str,i)
+    if t == 32 or t == 59 or t == 61 then -- space, semicolon, equals
+      break
+    end
+    i = i + 1
+  end
+  if i == init or i > max then return nil end
+  return init, i-1
 end
 
 function Twitch:is_nickchar(t,pos)
