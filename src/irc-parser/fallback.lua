@@ -1,7 +1,6 @@
 local byte = string.byte
 local sub = string.sub
 
-local char = string.char
 local find = string.find
 local gsub = string.gsub
 
@@ -606,11 +605,11 @@ function Strict:parse_tags(str,init,max)
     key = sub(str,key_s,key_e)
     i = key_e + 1
     t = byte(str,i)
-    if t == 32 then
-      tags[key] = false
+    if t == 32 then -- missing tag, end-of-tags
+      tags[key] = self.missing_tag_replacement
       return tags, i
-    elseif t == 59 then
-      tags[key] = false
+    elseif t == 59 then -- missing tag, more tags
+      tags[key] = self.missing_tag_replacement
       i = i + 1
     elseif t == 61 then
       i = i + 1
@@ -622,7 +621,7 @@ function Strict:parse_tags(str,init,max)
         return nil
       end
       if val_s > val_e then -- empty string
-        tags[key] = false
+        tags[key] = self.empty_tag_replacement
       else
         tags[key] = self:unescape_tag_val(sub(str,val_s,val_e))
       end
@@ -854,7 +853,8 @@ end
 
 function Strict:parse(str,init)
   init = init or 1
-  return self:parse_message(str,init,#str)
+  local msg, pos = self:parse_message(str,init,#str)
+  return msg, pos
 end
 
 for k,v in pairs(Strict) do
@@ -892,7 +892,27 @@ local typ_map = {
   [TWITCH] = Twitch__mt,
 }
 
-local function new(typ)
+local function new(typ,params)
+  if not params then params = {} end
+
+  local empty_replacement = false
+  local missing_replacement = false
+
+  if params.empty_tag_replacement ~= nil then
+    empty_replacement = params.empty_tag_replacement
+  end
+
+  if params.missing_tag_replacement ~= nil then
+    missing_replacement = params.missing_tag_replacement
+  end
+
+  if params.remove_empty_tags then
+    empty_replacement = nil
+  end
+
+  if params.remove_missing_tags then
+    missing_replacement = nil
+  end
   if not typ then
     typ = LOOSE
   end
@@ -906,7 +926,11 @@ local function new(typ)
     return nil,'invalid type specified'
   end
 
-  return setmetatable({},typ)
+  local self = setmetatable({
+    empty_tag_replacement = empty_replacement,
+    missing_tag_replacement = missing_replacement,
+  },typ)
+  return self
 end
 
 local module = setmetatable({
@@ -915,8 +939,8 @@ local module = setmetatable({
   TWITCH = TWITCH,
   LOOSE  = LOOSE,
 }, {
-  __call = function(_,typ)
-    return new(typ)
+  __call = function(_,typ,params)
+    return new(typ,params)
   end,
 })
 

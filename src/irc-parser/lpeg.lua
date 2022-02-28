@@ -3,7 +3,6 @@ local lpeg = require'lpeg'
 local rawset = rawset
 local gsub = string.gsub
 local find = string.find
-local char = string.char
 
 local V = lpeg.V
 local P = lpeg.P
@@ -50,124 +49,143 @@ escapes['s']  = ' '
 escapes['r']  = '\r'
 escapes['n']  = '\n'
 
-local function unescape_tag_val(_,_,val)
-  if #val == 0 then
-    return true,false
+local function create_unescape_tag_val(replacement)
+  return function(_,_,val)
+    if #val == 0 then
+      return true, replacement
+    end
+    if not find(val,'\\',1,true) then
+      return true,val
+    end
+    val = gsub(val,'\\(.?)',escapes)
+    return true, val
   end
-  if not find(val,'\\',1,true) then
-    return true,val
-  end
-  val = gsub(val,'\\(.?)',escapes)
-  return true, val
 end
 
-local strict_grammar = {
-  'message',
-  message =   (P'@' * Cg(V'tags','tags'))^-1
-            * (P':' * Cg(Ct(V'source'),'source'))^-1
-            * Cg(V'command','command')
-            * (V'space' * Cg(Ct(V'params'),'params'))^0
-            * (CRLF + LF + -P(1)),
+local function create_base_grammar(params)
+  if not params then params = {} end
+  local empty_replacement = false
+  local missing_replacement = false
 
-  tags = Cf(Ct'' * (V'tag' * (P';' * V'tag')^0),rawset) * V'space',
+  if params.empty_tag_replacement ~= nil then
+    empty_replacement = params.empty_tag_replacement
+  end
 
-  tag = Cg(C(V'tag_key') * ( (P'=' * V'tag_value') + Cc(false))),
-  tag_key = P'+'^-1 * ( V'tag_vendor' * P'/' )^-1 * V'tag_name',
-  tag_vendor = V'host',
-  tag_name = (LETTER + DIGIT + DASH)^1,
-  tag_value = Cmt(R('\001\009','\011\12','\014\031','\033\058','\060\255')^0 , unescape_tag_val),
+  if params.missing_tag_replacement ~= nil then
+    missing_replacement = params.missing_tag_replacement
+  end
 
-  -- we create a distinct 'userhost' type,
-  -- so that we can override it
-  -- grammar
-  source = (Cg(V'host','host') * V'space') +
-           (
-             (Cg(V'nick','nick') *
-             (P'!' * Cg(V'user','user'))^-1 *
-             (P'@' * Cg(V'userhost','host'))^-1)
-           * V'space'),
+  if params.remove_empty_tags then
+    empty_replacement = nil
+  end
 
-  userhost = V'host',
+  if params.remove_missing_tags then
+    missing_replacement = nil
+  end
 
-  command = (LETTER^1) + (DIGIT * DIGIT * DIGIT),
+  local grammar = {
+    'message',
+    message =   (P'@' * Cg(V'tags','tags'))^-1
+              * (P':' * Cg(Ct(V'source'),'source'))^-1
+              * Cg(V'command','command')
+              * (V'space' * Cg(Ct(V'params'),'params'))^0
+              * (CRLF + LF + -P(1)),
 
-  params = (C(V'middle') * (V'space' * V'params')^0) + (':' * C(V'trailing')),
-  middle = V'nospcrlfcl' * (P':' + V'nospcrlfcl')^0,
-  trailing = (P':' + P' ' + V'nospcrlfcl')^0,
+    tags = Cf(Ct'' * (V'tag' * (P';' * V'tag')^0),rawset) * V'space',
 
-  host = V'hostaddr' + (V'hostname' - (OCTET * '.' * OCTET * '.' * OCTET * '.' * OCTET)),
-  hostname = V'label' * (P'.' * V'label')^0,
-  hostaddr = V'ip4addr' + V'ip6addr',
-  ip4addr = IP4,
-  ip6addr =        HG * HG * HG * HG * HG * HG * LS32
-              + P'::' * HG * HG * HG * HG * HG * LS32
-    + H16^-1  * P'::' * HG * HG * HG * HG * LS32
-    + (HG * HG^-1 + P':') * P':' * HG * HG * HG * LS32
-    + (HG * HG^-2 + P':') * P':' * HG * HG * LS32
-    + (HG * HG^-3 + P':') * P':' * HG * LS32
-    + (HG * HG^-4 + P':') * P':' * LS32
-    + (HG * HG^-5 + P':') * P':' * H16
-    + (HG * HG^-6 + P':') * P':',
-  label = (LETTER + DIGIT) * (LETTER + DIGIT + DASH)^0 * (LETTER + DIGIT)^0,
-  nick = (LETTER + SPECIAL) * (LETTER + DIGIT + SPECIAL + P'-')^0,
-  user = R('\001\009','\011\012','\014\031','\033\063','\065\255')^1,
+    tag = Cg(C(V'tag_key') * ( (P'=' * V'tag_value') + V'tag_missing')),
+    tag_key = P'+'^-1 * ( V'tag_vendor' * P'/' )^-1 * V'tag_name',
+    tag_vendor = V'host',
+    tag_name = (LETTER + DIGIT + DASH)^1,
+    tag_value = Cmt(V'tag_raw_value', create_unescape_tag_val(empty_replacement)),
+    tag_raw_value = R('\001\009','\011\12','\014\031','\033\058','\060\255')^0,
+    tag_missing = Cc(missing_replacement),
 
-  space = SPACE^1,
+    -- we create a distinct 'userhost' type,
+    -- so that we can override it
+    -- grammar
+    source = (Cg(V'host','host') * V'space') +
+             (
+               (Cg(V'nick','nick') *
+               (P'!' * Cg(V'user','user'))^-1 *
+               (P'@' * Cg(V'userhost','host'))^-1)
+             * V'space'),
 
-  nonwhite   = R('\001\009','\011\012','\014\031','\033\255'),
-  nospcrlfcl = R('\001\009','\011\012','\014\031','\033\057','\059\255'),
+    userhost = V'host',
+
+    command = (LETTER^1) + (DIGIT * DIGIT * DIGIT),
+
+    params = (C(V'middle') * (V'space' * V'params')^0) + (':' * C(V'trailing')),
+    middle = V'nospcrlfcl' * (P':' + V'nospcrlfcl')^0,
+    trailing = (P':' + P' ' + V'nospcrlfcl')^0,
+
+    host = V'hostaddr' + (V'hostname' - (OCTET * '.' * OCTET * '.' * OCTET * '.' * OCTET)),
+    hostname = V'label' * (P'.' * V'label')^0,
+    hostaddr = V'ip4addr' + V'ip6addr',
+    ip4addr = IP4,
+    ip6addr =        HG * HG * HG * HG * HG * HG * LS32
+                + P'::' * HG * HG * HG * HG * HG * LS32
+      + H16^-1  * P'::' * HG * HG * HG * HG * LS32
+      + (HG * HG^-1 + P':') * P':' * HG * HG * HG * LS32
+      + (HG * HG^-2 + P':') * P':' * HG * HG * LS32
+      + (HG * HG^-3 + P':') * P':' * HG * LS32
+      + (HG * HG^-4 + P':') * P':' * LS32
+      + (HG * HG^-5 + P':') * P':' * H16
+      + (HG * HG^-6 + P':') * P':',
+    label = (LETTER + DIGIT) * (LETTER + DIGIT + DASH)^0 * (LETTER + DIGIT)^0,
+    nick = (LETTER + SPECIAL) * (LETTER + DIGIT + SPECIAL + P'-')^0,
+    user = R('\001\009','\011\012','\014\031','\033\063','\065\255')^1,
+
+    space = SPACE^1,
+
+    nonwhite   = R('\001\009','\011\012','\014\031','\033\255'),
+    nospcrlfcl = R('\001\009','\011\012','\014\031','\033\057','\059\255'),
+  }
+
+  return grammar
+end
+
+local strict_grammar = {}
+local twitch_grammar = {
+  userhost       = (V'twitchusername' * P'.' * V'host') + V'host',
+  nick           = V'twitchusername',
+  user           = V'twitchusername',
+  twitchusername = (LETTER + DIGIT) * (LETTER + DIGIT + P'_')^0,
 }
 
-local twitch_grammar = {}
-local loose_grammar = {}
-for k,v in pairs(strict_grammar) do
-  twitch_grammar[k] = v
-  loose_grammar[k] = v
-end
+local loose_grammar = {
+  -- a lot of IRC servers let users "cloak" their IP/hostname
+  -- and includes characters not allowed in DNS, like:
+  -- :nick!~user@user/nick/etc
+  -- so we override the userhost to just allow anything besides CR, LF, Space
+  userhost = V'nonwhite'^1,
 
--- since twitch puts the username in the first part
--- of the host, allow the first part to be a twitch
--- username
-twitch_grammar.userhost       = (V'twitchusername' * P'.' * V'host') + V'host'
-twitch_grammar.nick           = V'twitchusername'
-twitch_grammar.user           = V'twitchusername'
-twitch_grammar.twitchusername = (LETTER + DIGIT) * (LETTER + DIGIT + P'_')^0
+  -- let the loose grammar accept anything for a nick, besides !@
+  nick =  R('\001\009','\011\012','\014\031','\034\063','\065\255')^1,
 
--- a lot of IRC servers let users "cloak" their IP/hostname
--- and includes characters not allowed in DNS, like:
--- :nick!~user@user/nick/etc
--- so we override the userhost to just allow anything besides CR, LF, Space
-loose_grammar.userhost = V'nonwhite'^1
+  -- tag vendor, don't check for actual hostnames and ip addresses
+  tag_vendor = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1,
 
--- let the loose grammar accept anything for a nick, besides !@
-loose_grammar.nick =  R('\001\009','\011\012','\014\031','\034\063','\065\255')^1
-
--- tag vendor, don't check for actual hostnames and ip addresses
-loose_grammar.tag_vendor = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1
-
--- tag name, allow anything besides =;' '
-loose_grammar.tag_name = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1
-
-local strict_parser = Ct(P(strict_grammar)) * lpeg.Cp()
---local strict_parser = Ct(P(require('pegdebug').trace(strict_grammar))) * lpeg.Cp()
-local twitch_parser = Ct(P(twitch_grammar)) * lpeg.Cp()
-local loose_parser = Ct(P(loose_grammar)) * lpeg.Cp()
+  -- tag name, allow anything besides =;' '
+  tag_name = (R('\001\009','\011\012','\014\031','\033\046','\048\058','\062\255') + P('\060'))^1,
+}
 
 local Strict = {
-  parser = strict_parser,
+  grammar = strict_grammar,
   parse = function(self,str,init)
     init = init or 1
-    return self.parser:match(str,init)
+    local msg, pos = self.parser:match(str,init)
+    return msg, pos
   end,
 }
 
 local Twitch = {
-  parser = twitch_parser,
+  grammar = twitch_grammar,
   parse = Strict.parse,
 }
 
 local Loose = {
-  parser = loose_parser,
+  grammar = loose_grammar,
   parse = Strict.parse,
 }
 
@@ -201,7 +219,7 @@ local typ_map = {
   [TWITCH] = Twitch__mt,
 }
 
-local function new(typ)
+local function new(typ,params)
   if not typ then
     typ = LOOSE
   end
@@ -215,7 +233,14 @@ local function new(typ)
     return nil,'invalid type specified'
   end
 
-  return setmetatable({},typ)
+  local self = setmetatable({},typ)
+  local grammar = create_base_grammar(params)
+  for k,v in pairs(self.grammar) do
+    grammar[k] = v
+  end
+  self.grammar = grammar
+  self.parser = Ct(P(self.grammar)) * lpeg.Cp()
+  return self
 end
 
 local module = setmetatable({
@@ -224,8 +249,8 @@ local module = setmetatable({
   TWITCH = TWITCH,
   LOOSE  = LOOSE,
 }, {
-  __call = function(_,typ)
-    return new(typ)
+  __call = function(_,typ,params)
+    return new(typ,params)
   end,
 })
 

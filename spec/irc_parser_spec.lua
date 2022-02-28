@@ -433,6 +433,64 @@ local function generate_backend_test(b)
             assert.is_same(res,parser:parse(str))
           end)
 
+          it('should allow setting empty #tags to a custom type', function()
+            local p = irc_parser(t, {
+              empty_tag_replacement = '',
+            })
+            local res = {
+              tags = {
+                ['a'] = '1',
+                ['b'] = '',
+              },
+              command = 'PRIVMSG',
+            }
+            local str = '@a=1;b= PRIVMSG'
+            assert.is_same(res,p(str))
+          end)
+
+          it('should allow removing empty #tags', function()
+            local p = irc_parser(t, {
+              remove_empty_tags = true,
+            })
+            local res = {
+              tags = {
+                ['a'] = '1',
+              },
+              command = 'PRIVMSG',
+            }
+            local str = '@a=1;b= PRIVMSG'
+            assert.is_same(res,p(str))
+          end)
+
+          it('should allow setting missing #tags to a custom type', function()
+            local p = irc_parser(t, {
+              missing_tag_replacement = '',
+            })
+            local res = {
+              tags = {
+                ['a'] = '1',
+                ['b'] = '',
+              },
+              command = 'PRIVMSG',
+            }
+            local str = '@a=1;b PRIVMSG'
+            assert.is_same(res,p(str))
+          end)
+
+          it('should allow removing missing #tags', function()
+            local p = irc_parser(t, {
+              remove_missing_tags = true,
+            })
+            local res = {
+              tags = {
+                ['a'] = '1',
+              },
+              command = 'PRIVMSG',
+            }
+            local str = '@a=1;b PRIVMSG'
+            assert.is_same(res,p(str))
+          end)
+
           it('should escape #tags including invalid escapes', function()
             local res = {
               tags = {

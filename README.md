@@ -62,8 +62,10 @@ to the pure-Lua backend if LPEG is not available.
 You can force a specific backend by requiring it: `require('irc-parser.fallback')`
 for the Lua fallback, and `require('irc-parser.lpeg')` for the LPEG version.
 
-You can then instantiate a parser with `.new([mode])` (or just call the returned
-module directly like `parser = require('irc-parser')([mode])`.
+### Instantiating
+
+You can then instantiate a parser with `.new([mode],[opts])` (or just call the returned
+module directly like `parser = require('irc-parser')([mode],[opts])`.
 
 The `mode` argument is optional. If not specified, the parser will be in
 `LOOSE` mode.
@@ -91,6 +93,34 @@ local strict_parser = require('irc-parser')('STRICT')
 local mod = require('irc-parser')
 local strict_parser = mod.new(mod.STRICT)
 ```
+
+The `opts` argument is a table of options to fine-tune handling of empty and
+missing tag values. By default, empty and missing tags are converted to
+the boolean `false`.
+
+If you'd prefer a different value for either empty or missing tags (example,
+say you want empty tags to remain empty strings), you can:
+
+```lua
+local parser = require('irc-parser')('loose', {
+  empty_tag_replacement = '',
+})
+```
+
+And now empty tags will be returned as empty strings, missing tags
+will remain as `false`.
+
+You can also specify that you'd like empty and missing strings to be
+removed entirely:
+
+```lua
+local parser = require('irc-parser')('loose', {
+  remove_empty_tags = true,
+  remove_missing_tags = true,
+})
+```
+
+### Parsing
 
 The parser exposes a single method, `parser:parse(str, [pos])`. The parser itself
 can also be called as a function, `parser(str, [pos])`.
@@ -137,19 +167,6 @@ while pos < #rawdata do
 end
 ```
 
-### Message Tags
-
-When dealing with message tags, the specs allow for creating tags
-with empty values, as well as missing values.
-
-The specs state that clients must interpret empty tag values as
-equivalent to missing tag values. Clients may convert from the
-empty form to the missing form, but not the other way around.
-
-Empty tags and missing tags are both represented with the
-boolean `false`. This way, the tag still appears in the `tags`
-table. If you simply test that the value is truthy, you know
-it's a string with data.
 
 ## LICENSE
 
