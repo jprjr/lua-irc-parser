@@ -13,22 +13,22 @@ local Strict = {}
 local Twitch = {}
 local Loose = {}
 
-Strict.escapes = {}
-for e=1,255 do
-  Strict.escapes['\\' .. char(e)] = char(e)
-end
-Strict.escapes['\\\\'] = '\\'
-Strict.escapes['\\:']  = ';'
-Strict.escapes['\\s']  = ' '
-Strict.escapes['\\r']  = '\r'
-Strict.escapes['\\n']  = '\n'
-Strict.escapes['\\']  = ''
+Strict.escapes = setmetatable({}, {
+  __index = function(_,k)
+    return k
+  end,
+})
+Strict.escapes['\\'] = '\\'
+Strict.escapes[':']  = ';'
+Strict.escapes['s']  = ' '
+Strict.escapes['r']  = '\r'
+Strict.escapes['n']  = '\n'
 
 function Strict:unescape_tag_val(val)
   if not find(val,'\\',1,true) then
     return val
   end
-  val = gsub(val,'\\.?',self.escapes)
+  val = gsub(val,'\\(.?)',self.escapes)
   return val
 end
 

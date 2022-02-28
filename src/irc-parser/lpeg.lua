@@ -38,16 +38,16 @@ local H16 = HEXDIGIT * HEXDIGIT^-3
 local HG  = H16 * P':'
 local LS32 = HG * H16 + IP4
 
-local escapes = {}
-for e=1,255 do
-  escapes['\\' .. char(e)] = char(e)
-end
-escapes['\\\\'] = '\\'
-escapes['\\:']  = ';'
-escapes['\\s']  = ' '
-escapes['\\r']  = '\r'
-escapes['\\n']  = '\n'
-escapes['\\']  = ''
+local escapes = setmetatable({}, {
+  __index = function(_,k)
+    return k
+  end,
+})
+escapes['\\'] = '\\'
+escapes[':']  = ';'
+escapes['s']  = ' '
+escapes['r']  = '\r'
+escapes['n']  = '\n'
 
 local function unescape_tag_val(_,_,val)
   if #val == 0 then
@@ -56,7 +56,7 @@ local function unescape_tag_val(_,_,val)
   if not find(val,'\\',1,true) then
     return true,val
   end
-  val = gsub(val,'\\.?',escapes)
+  val = gsub(val,'\\(.?)',escapes)
   return true, val
 end
 
