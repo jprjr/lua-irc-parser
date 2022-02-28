@@ -421,6 +421,18 @@ local function generate_backend_test(b)
             assert.is_equal(#crlf+1,select(2,parser:parse(crlf)))
           end)
 
+          it('should only retain the last instance of #tags', function()
+            local res = {
+              tags = {
+                ['a'] = 'final',
+                ['b'] = false,
+              },
+              command = 'PRIVMSG',
+            }
+            local str = '@a=1;b=2;a;a=final;b PRIVMSG'
+            assert.is_same(res,parser:parse(str))
+          end)
+
           it('should escape #tags including invalid escapes', function()
             local res = {
               tags = {
