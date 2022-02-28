@@ -40,9 +40,6 @@ Strict.escapes['\\n']  = '\n'
 Strict.escapes['\\']  = ''
 
 function Strict:unescape_tag_val(val)
-  if #val == 0 then
-    return false
-  end
   if not find(val,'\\',1,true) then
     return val
   end
