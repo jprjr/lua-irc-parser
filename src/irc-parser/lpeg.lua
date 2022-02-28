@@ -191,8 +191,8 @@ local Loose__mt = {
 
 local typ_map = {
   [1] = Loose__mt,
-  [2] = Twitch__mt,
-  [3] = Strict__mt,
+  [2] = Strict__mt,
+  [3] = Twitch__mt,
   ['loose'] = Loose__mt,
   [LOOSE] = Loose__mt,
   ['strict'] = Strict__mt,
@@ -204,6 +204,10 @@ local typ_map = {
 local function new(typ)
   if not typ then
     typ = LOOSE
+  end
+
+  if type(typ) == 'string' then
+    typ = typ:lower()
   end
 
   typ = typ_map[typ]

@@ -5,6 +5,6 @@ if not ok then
   mod = require'irc-parser.fallback'
 end
 
-mod._VERSION = '1.0.1'
+mod._VERSION = '1.1.0'
 
 return mod

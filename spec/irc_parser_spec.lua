@@ -22,7 +22,7 @@ local function generate_backend_test(b)
     end)
 
     it('#core should be callable with string arguments', function()
-      for _,t in ipairs({'loose','twitch','strict'}) do
+      for _,t in ipairs({'loose','strict','twitch'}) do
         local parser = irc_parser(t)
         local mt = debug.getmetatable(parser)
         assert.are_equals(mt.__name,'irc-parser.' .. t)
@@ -30,7 +30,7 @@ local function generate_backend_test(b)
     end)
 
     it('#core should be callable with numeric arguments', function()
-      for i,t in ipairs({'loose','twitch','strict'}) do
+      for i,t in ipairs({'loose','strict','twitch'}) do
         local parser = irc_parser(i)
         local mt = debug.getmetatable(parser)
         assert.are_equals(mt.__name,'irc-parser.' .. t)
@@ -38,7 +38,7 @@ local function generate_backend_test(b)
     end)
 
     it('#core should be callable with table arguments', function()
-      for _,t in ipairs({'loose','twitch','strict'}) do
+      for _,t in ipairs({'loose','strict','twitch'}) do
         local key = t:upper()
         local parser = irc_parser(irc_parser[key])
         local mt = debug.getmetatable(parser)
@@ -58,7 +58,7 @@ local function generate_backend_test(b)
       end)
 
       it('should be callable with string arguments', function()
-        for _,t in ipairs({'loose','twitch','strict'}) do
+        for _,t in ipairs({'loose','strict','twitch'}) do
           local parser = irc_parser.new(t)
           local mt = debug.getmetatable(parser)
           assert.are_equals(mt.__name,'irc-parser.' .. t)
@@ -66,7 +66,7 @@ local function generate_backend_test(b)
       end)
 
       it('should be callable with numeric arguments', function()
-        for i,t in ipairs({'loose','twitch','strict'}) do
+        for i,t in ipairs({'loose','strict','twitch'}) do
           local parser = irc_parser.new(i)
           local mt = debug.getmetatable(parser)
           assert.are_equals(mt.__name,'irc-parser.' .. t)
@@ -74,7 +74,7 @@ local function generate_backend_test(b)
       end)
 
       it('should be callable with table arguments', function()
-        for _,t in ipairs({'loose','twitch','strict'}) do
+        for _,t in ipairs({'loose','strict','twitch'}) do
           local key = t:upper()
           local parser = irc_parser.new(irc_parser[key])
           local mt = debug.getmetatable(parser)

@@ -56,30 +56,38 @@ opm install jprjr/irc-parser
 By default, you can `require('irc-parser')`, and it will automatically
 choose an appropriate backend.
 
-It will first try to load the LPEG-based parser, and fall back
-to the pure-Lua parser if LPEG is not available.
+It will first try to load the LPEG-based backend, and fall back
+to the pure-Lua backend if LPEG is not available.
 
 You can force a specific backend by requiring it: `require('irc-parser.fallback')`
 for the Lua fallback, and `require('irc-parser.lpeg')` for the LPEG version.
 
-You can then instantiate a parser with `.new()` (or just call the returned
-module directly like `parser = require('irc-parser')()`.
+You can then instantiate a parser with `.new([mode])` (or just call the returned
+module directly like `parser = require('irc-parser')([mode])`.
 
-There's three different parsers available:
+The `mode` argument is optional. If not specified, the parser will be in
+`LOOSE` mode.
 
-* `LOOSE` - (the default), aims to be broadly-compatible.
+There's three different modes available:
+
+* `LOOSE` - aims to be broadly-compatible.
 * `STRICT` - follows the IRC RFCs as closely as possible.
 * `TWITCH` - essentially `STRICT` with a few modifications for Twitch's IRC interface.
 
-The default `LOOSE` parser should work on most IRC servers, including Twitch.
+The default `LOOSE` mode should work on most IRC servers, including Twitch. In
+my testing, it's also the fastest (since it performs less validations than
+any other mode).
 
-You can specify which parser you'd like in a few ways:
+You can specify which mode you'd like in a few ways:
 
 ```lua
 
 -- these are all equivalent:
+-- use a string name
 local strict_parser = require('irc-parser')('strict')
+local strict_parser = require('irc-parser')('STRICT')
 
+-- use an enum
 local mod = require('irc-parser')
 local strict_parser = mod.new(mod.STRICT)
 ```
@@ -101,6 +109,14 @@ If not successful, it returns `nil`.
 Here's an example of looping through a block of data using the
 position argument and return value.
 
+The returned table will have the following keys:
+
+* `tags` - a table of tag values, or `nil` if no tags were attached to the message.
+* `source` - a table representing the message source with the keys `host`, `nick`,
+and/or `user`. `source` will be `nil` if there was no source on the message.
+* `command` - an IRC command (ie, `PRIVMSG`, `001`, etc).
+* `params` - an array-like table of parameters, or `nil` if there were no parameters.
+
 ```
 local parser = require('irc-parser').new()
 -- we'll say that "raw.txt" is a raw IRC log file with multiple lines
@@ -117,6 +133,7 @@ while pos < #rawdata do
     break
   end
   -- do something with parsed
+  print(parsed.command)
 end
 ```
 
