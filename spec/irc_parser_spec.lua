@@ -380,6 +380,22 @@ local function generate_backend_test(b)
             )
           end)
 
+          it('should accept zero-length trailing parameters', function()
+            local res = {
+              command = 'PRIVMSG',
+              params = { '#room', '' },
+            }
+
+            assert.is_same(parser:parse('PRIVMSG #room :'), res)
+            assert.is_same(parser:parse('PRIVMSG #room :\n'), res)
+            assert.is_same(parser:parse('PRIVMSG #room :\r\n'), res)
+          end)
+
+          it('should accept reject trailing spaces after parameters', function()
+            assert.is_nil(parser:parse('PRIVMSG '))
+            assert.is_nil(parser:parse('PRIVMSG #some-room '))
+          end)
+
           it('should consume the entire string, including trailing crlf', function()
             local str = 'PRIVMSG #room ::) hello there! :-)'
             local lf = str .. '\n'
